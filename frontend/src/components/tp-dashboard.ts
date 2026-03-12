@@ -2,6 +2,7 @@ import { Chart, registerables } from 'chart.js'
 import { LitElement, html } from 'lit'
 import { customElement, state } from 'lit/decorators.js'
 import { api } from '../lib/api'
+import { t, I18nController } from '../lib/i18n'
 
 Chart.register(...registerables)
 
@@ -25,6 +26,7 @@ function ma(arr: number[], w: number) {
 export class TpDashboard extends LitElement {
   protected createRenderRoot(): HTMLElement { return this }
 
+  private i18n = new I18nController(this)
   @state() stats: Stats | null = null
   @state() daily: DayData[] = []
   @state() days = 30
@@ -39,14 +41,14 @@ export class TpDashboard extends LitElement {
   async load() {
     try {
       const tokenParam = this.selectedTokenId != null ? `&token_id=${this.selectedTokenId}` : ''
-      const [s, u, t] = await Promise.all([
+      const [s, u, tk] = await Promise.all([
         api<Stats>(`/stats?_=${Date.now()}${tokenParam}`),
         api<{ daily: DayData[] }>(`/stats/usage/daily?days=${this.days}${tokenParam}`),
         api<{ tokens: TokenItem[] }>('/tokens'),
       ])
       this.stats = s
       this.daily = u.daily
-      this.tokens = t.tokens
+      this.tokens = tk.tokens
       await this.updateComplete
       this.renderChart()
     } catch (e: unknown) { console.error('[Dashboard]', e) }
@@ -70,8 +72,8 @@ export class TpDashboard extends LitElement {
       data: {
         labels,
         datasets: [
-          { type: 'bar', label: '每日', data: counts, backgroundColor: bar, borderColor: barBd, borderWidth: 1, borderRadius: 2, order: 2 },
-          { type: 'line', label: '7日均线', data: ma(counts, 7), borderColor: line, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, borderDash: [4, 3], tension: 0.4, order: 1 },
+          { type: 'bar', label: t('dashboard.chartDaily'), data: counts, backgroundColor: bar, borderColor: barBd, borderWidth: 1, borderRadius: 2, order: 2 },
+          { type: 'line', label: t('dashboard.chartMa7'), data: ma(counts, 7), borderColor: line, backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, borderDash: [4, 3], tension: 0.4, order: 1 },
         ],
       },
       options: {
@@ -90,7 +92,7 @@ export class TpDashboard extends LitElement {
   }
 
   render() {
-    if (!this.stats) return html`<div class="text-t3 text-sm">加载中...</div>`
+    if (!this.stats) return html`<div class="text-t3 text-sm">${t('common.loading')}</div>`
     const s = this.stats
     const pct = s.total_capacity > 0 ? Math.round(s.total_usage_this_month / s.total_capacity * 100) : 0
     const barC = pct > 80 ? 'bg-err' : pct > 50 ? 'bg-warn' : 'bg-ok'
@@ -100,40 +102,40 @@ export class TpDashboard extends LitElement {
     return html`
       <div class="space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-base font-semibold text-t1">概览</h2>
+          <h2 class="text-base font-semibold text-t1">${t('dashboard.title')}</h2>
           <div class="flex items-center gap-2">
             ${this.tokens.length ? html`
               <select class="select text-xs" @change=${(e: Event) => { const v = (e.target as HTMLSelectElement).value; this.selectedTokenId = v === '' ? null : parseInt(v); this.load() }}>
-                <option value="">全部 Token</option>
-                ${this.tokens.map(t => html`<option value=${t.id} ?selected=${this.selectedTokenId === t.id}>${t.name}</option>`)}
+                <option value="">${t('dashboard.allTokens')}</option>
+                ${this.tokens.map(tk => html`<option value=${tk.id} ?selected=${this.selectedTokenId === tk.id}>${tk.name}</option>`)}
               </select>
             ` : ''}
-            <button class="btn btn-ghost btn-sm" @click=${() => this.load()}>刷新</button>
+            <button class="btn btn-ghost btn-sm" @click=${() => this.load()}>${t('common.refresh')}</button>
           </div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div class="card p-3.5">
-            <div class="text-xs text-t3 mb-1">可用 Key</div>
+            <div class="text-xs text-t3 mb-1">${t('dashboard.activeKeys')}</div>
             <div class="font-mono text-xl font-semibold tabular-nums"><span class="text-ok">${s.active_keys}</span><span class="text-t3 text-sm font-normal"> / ${s.total_keys}</span></div>
           </div>
           <div class="card p-3.5">
-            <div class="text-xs text-t3 mb-1">剩余额度</div>
+            <div class="text-xs text-t3 mb-1">${t('dashboard.remaining')}</div>
             <div class="font-mono text-xl font-semibold text-ac tabular-nums">${s.remaining}</div>
           </div>
           <div class="card p-3.5">
-            <div class="text-xs text-t3 mb-1">今日用量</div>
+            <div class="text-xs text-t3 mb-1">${t('dashboard.todayUsage')}</div>
             <div class="font-mono text-xl font-semibold text-t1 tabular-nums">${s.picks_today}</div>
           </div>
           <div class="card p-3.5">
-            <div class="text-xs text-t3 mb-1">耗尽 / 无效</div>
+            <div class="text-xs text-t3 mb-1">${t('dashboard.exhaustedInvalid')}</div>
             <div class="font-mono text-xl tabular-nums"><span class="text-warn font-semibold">${s.exhausted_keys}</span><span class="text-t3 text-sm"> / </span><span class="text-err font-semibold">${s.invalid_keys}</span></div>
           </div>
         </div>
 
         <div class="card p-3.5">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs text-t3">本月用量</span>
+            <span class="text-xs text-t3">${t('dashboard.monthlyUsage')}</span>
             <span class="font-mono text-xs text-t2 tabular-nums">${s.total_usage_this_month} / ${s.total_capacity} · ${pct}%</span>
           </div>
           <div class="w-full h-1.5 rounded-full bg-sf2 overflow-hidden">
@@ -144,14 +146,14 @@ export class TpDashboard extends LitElement {
         <div class="card p-4">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-t1">用量趋势</span>
-              <span class="text-xs text-t3 font-mono tabular-nums">共${total}次 · 日均${avg}</span>
+              <span class="text-sm font-medium text-t1">${t('dashboard.usageTrend')}</span>
+              <span class="text-xs text-t3 font-mono tabular-nums">${t('dashboard.totalAvg', total, avg)}</span>
             </div>
             <select class="select text-xs" @change=${(e: Event) => { this.days = parseInt((e.target as HTMLSelectElement).value); this.load() }}>
-              <option value="7" ?selected=${this.days === 7}>7天</option>
-              <option value="14" ?selected=${this.days === 14}>14天</option>
-              <option value="30" ?selected=${this.days === 30}>30天</option>
-              <option value="90" ?selected=${this.days === 90}>90天</option>
+              <option value="7" ?selected=${this.days === 7}>${t('dashboard.days7')}</option>
+              <option value="14" ?selected=${this.days === 14}>${t('dashboard.days14')}</option>
+              <option value="30" ?selected=${this.days === 30}>${t('dashboard.days30')}</option>
+              <option value="90" ?selected=${this.days === 90}>${t('dashboard.days90')}</option>
             </select>
           </div>
           <div style="position:relative;height:180px"><canvas id="chart"></canvas></div>

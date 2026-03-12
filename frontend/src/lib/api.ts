@@ -1,3 +1,5 @@
+import { t } from './i18n'
+
 type Listener = () => void
 
 class Store {
@@ -43,19 +45,19 @@ export async function api<T = any>(path: string, opts: RequestInit = {}): Promis
   try {
     json = await res.json()
   } catch {
-    const text = `服务器返回非 JSON (HTTP ${res.status})`
+    const text = t('api.nonJsonResponse', res.status)
     console.error(`[API] ${path}:`, text)
     throw new Error(text)
   }
 
   if (res.status === 401 && store.isLoggedIn && path !== '/auth/login') {
     store.logout()
-    throw new Error('登录已过期')
+    throw new Error(t('api.loginExpired'))
   }
 
   const body = json as { success?: boolean; error?: string; data?: T }
   if (!body.success) {
-    const msg = body.error || `请求失败 (${res.status})`
+    const msg = body.error || t('api.requestFailed', res.status)
     console.error(`[API] ${path}:`, msg)
     throw new Error(msg)
   }

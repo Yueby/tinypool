@@ -1,18 +1,23 @@
+declare const __BUILD_VERSION__: string
+
 import { LitElement, html, nothing } from 'lit'
 import { customElement, state } from 'lit/decorators.js'
 import { api } from '../lib/api'
 import { toast } from '../lib/toast'
+import { t, I18nController } from '../lib/i18n'
 
 interface Token { id: number; name: string; token: string; created_at: string }
 interface MailConfig { enabled: boolean; url: string; domain: string; password: string }
 interface AutoReplenish { enabled: boolean; min_healthy_keys: number; remaining_threshold: number }
 
 const INTERVAL_OPTIONS = [5, 15, 30, 60, 360, 720, 1440] as const
-const INTERVAL_LABELS: Record<number, string> = { 5: '每 5 分钟', 15: '每 15 分钟', 30: '每 30 分钟', 60: '每小时', 360: '每 6 小时', 720: '每 12 小时', 1440: '每天' }
+const INTERVAL_I18N: Record<number, string> = { 5: 'settings.every5min', 15: 'settings.every15min', 30: 'settings.every30min', 60: 'settings.everyHour', 360: 'settings.every6h', 720: 'settings.every12h', 1440: 'settings.everyDay' }
 
 @customElement('tp-settings')
 export class TpSettings extends LitElement {
   protected createRenderRoot(): HTMLElement { return this }
+
+  private i18n = new I18nController(this)
   @state() syncInterval = 360
   @state() tokens: Token[] = []
   @state() showNewToken = false
@@ -25,22 +30,22 @@ export class TpSettings extends LitElement {
 
   async load() {
     try {
-      const [i, t, m, ar] = await Promise.all([
+      const [i, tk, m, ar] = await Promise.all([
         api<{ interval_minutes: number }>('/settings/sync-interval'),
         api<{ tokens: Token[] }>('/tokens'),
         api<MailConfig>('/settings/mail'),
         api<AutoReplenish>('/settings/auto-replenish'),
       ])
       this.syncInterval = i.interval_minutes
-      this.tokens = t.tokens
+      this.tokens = tk.tokens
       this.mail = m
       this.autoReplenish = ar
-    } catch (e: unknown) { toast((e as Error).message || '加载失败', 'error') }
+    } catch (e: unknown) { toast((e as Error).message || t('common.loadFailed'), 'error') }
   }
 
   async saveSyncInterval(e: Event) {
     const v = parseInt((e.target as HTMLSelectElement).value)
-    try { await api('/settings/sync-interval', { method: 'PUT', body: JSON.stringify({ interval_minutes: v }) }); this.syncInterval = v; toast('间隔已更新', 'success') } catch (e: unknown) { toast((e as Error).message, 'error') }
+    try { await api('/settings/sync-interval', { method: 'PUT', body: JSON.stringify({ interval_minutes: v }) }); this.syncInterval = v; toast(t('settings.intervalUpdated'), 'success') } catch (e: unknown) { toast((e as Error).message, 'error') }
   }
 
   async saveMail() {
@@ -51,7 +56,7 @@ export class TpSettings extends LitElement {
       const r = await api<{ enabled: boolean }>('/settings/mail', { method: 'PUT', body: JSON.stringify({ url, domain, password }) })
       this.mail = { enabled: r.enabled, url, domain, password }
       this.mailEditing = false
-      toast(r.enabled ? '已启用自动注册' : '已保存（未完整配置）', r.enabled ? 'success' : 'info')
+      toast(r.enabled ? t('settings.autoRegisterEnabled') : t('settings.savedIncomplete'), r.enabled ? 'success' : 'info')
     } catch (e: unknown) { toast((e as Error).message, 'error') }
   }
 
@@ -63,121 +68,122 @@ export class TpSettings extends LitElement {
       const r = await api<AutoReplenish>('/settings/auto-replenish', { method: 'PUT', body: JSON.stringify({ enabled, min_healthy_keys: minKeys, remaining_threshold: threshold }) })
       this.autoReplenish = r
       this.arEditing = false
-      toast('已保存', 'success')
+      toast(t('common.saved'), 'success')
     } catch (e: unknown) { toast((e as Error).message, 'error') }
   }
 
   async createToken() {
     const name = (this.querySelector('#tn') as HTMLInputElement)?.value.trim()
-    if (!name) return toast('请输入名称', 'error')
-    try { await api('/tokens', { method: 'POST', body: JSON.stringify({ name }) }); toast('已创建', 'success'); this.showNewToken = false; this.load() } catch (e: unknown) { toast((e as Error).message, 'error') }
+    if (!name) return toast(t('settings.enterName'), 'error')
+    try { await api('/tokens', { method: 'POST', body: JSON.stringify({ name }) }); toast(t('common.created'), 'success'); this.showNewToken = false; this.load() } catch (e: unknown) { toast((e as Error).message, 'error') }
   }
 
   async deleteToken(id: number) {
-    if (!confirm('删除后 Token 立即失效，确定？')) return
-    try { await api(`/tokens/${id}`, { method: 'DELETE' }); toast('已删除', 'success'); this.load() } catch (e: unknown) { toast((e as Error).message, 'error') }
+    if (!confirm(t('settings.deleteConfirm'))) return
+    try { await api(`/tokens/${id}`, { method: 'DELETE' }); toast(t('common.deleted'), 'success'); this.load() } catch (e: unknown) { toast((e as Error).message, 'error') }
   }
 
   render() {
     return html`
       <div class="space-y-5">
-        <h2 class="text-base font-semibold text-t1">设置</h2>
+        <h2 class="text-base font-semibold text-t1">${t('settings.title')}</h2>
 
         <div class="card p-4">
-          <div class="text-sm font-medium text-t1 mb-1">同步间隔</div>
-          <p class="text-xs text-t3 mb-3">Cron 每分钟检查，达到间隔后自动同步 Key 额度</p>
+          <div class="text-sm font-medium text-t1 mb-1">${t('settings.syncInterval')}</div>
+          <p class="text-xs text-t3 mb-3">${t('settings.syncIntervalDesc')}</p>
           <select class="select" @change=${this.saveSyncInterval}>
             ${INTERVAL_OPTIONS.map(v => html`
-              <option value=${v} ?selected=${this.syncInterval === v}>${INTERVAL_LABELS[v]}</option>
+              <option value=${v} ?selected=${this.syncInterval === v}>${t(INTERVAL_I18N[v])}</option>
             `)}
           </select>
         </div>
 
         <div class="card p-4">
           <div class="flex items-center justify-between mb-1">
-            <div class="text-sm font-medium text-t1">自动注册</div>
-            <span class="badge ${this.mail.enabled ? 'badge-success' : 'badge-muted'}">${this.mail.enabled ? '已启用' : '未配置'}</span>
+            <div class="text-sm font-medium text-t1">${t('settings.autoRegister')}</div>
+            <span class="badge ${this.mail.enabled ? 'badge-success' : 'badge-muted'}">${this.mail.enabled ? t('common.enabled') : t('common.notConfigured')}</span>
           </div>
-          <p class="text-xs text-t3 mb-3">配置临时邮箱服务后可自动注册 TinyPNG 账号获取 Key</p>
+          <p class="text-xs text-t3 mb-3">${t('settings.autoRegisterDesc')}</p>
           ${this.mailEditing ? html`
             <div class="space-y-2 mb-3">
-              <input id="mail-url" class="input w-full" placeholder="临时邮箱 API 地址" .value=${this.mail.url} />
-              <input id="mail-domain" class="input w-full" placeholder="邮箱域名" .value=${this.mail.domain} />
-              <input id="mail-pw" type="password" class="input w-full" placeholder="Admin 密码" .value=${this.mail.password} />
+              <input id="mail-url" class="input w-full" placeholder=${t('settings.mailApiUrl')} .value=${this.mail.url} />
+              <input id="mail-domain" class="input w-full" placeholder=${t('settings.mailDomain')} .value=${this.mail.domain} />
+              <input id="mail-pw" type="password" class="input w-full" placeholder=${t('settings.adminPassword')} .value=${this.mail.password} />
             </div>
             <div class="flex gap-2">
-              <button class="btn btn-primary btn-sm" @click=${() => this.saveMail()}>保存</button>
-              <button class="btn btn-ghost btn-sm" @click=${() => this.mailEditing = false}>取消</button>
+              <button class="btn btn-primary btn-sm" @click=${() => this.saveMail()}>${t('common.save')}</button>
+              <button class="btn btn-ghost btn-sm" @click=${() => this.mailEditing = false}>${t('common.cancel')}</button>
             </div>
           ` : html`
-            <button class="btn btn-ghost btn-sm" @click=${() => this.mailEditing = true}>配置</button>
+            <button class="btn btn-ghost btn-sm" @click=${() => this.mailEditing = true}>${t('common.configure')}</button>
           `}
         </div>
 
         <div class="card p-4">
           <div class="flex items-center justify-between mb-1">
-            <div class="text-sm font-medium text-t1">自动补充</div>
-            <span class="badge ${this.autoReplenish.enabled ? 'badge-success' : 'badge-muted'}">${this.autoReplenish.enabled ? '已启用' : '未启用'}</span>
+            <div class="text-sm font-medium text-t1">${t('settings.autoReplenish')}</div>
+            <span class="badge ${this.autoReplenish.enabled ? 'badge-success' : 'badge-muted'}">${this.autoReplenish.enabled ? t('common.enabled') : t('common.notEnabled')}</span>
           </div>
-          <p class="text-xs text-t3 mb-3">当健康 Key 不足时，Cron 自动注册新 Key（每次 1 个）</p>
+          <p class="text-xs text-t3 mb-3">${t('settings.autoReplenishDesc')}</p>
           ${this.arEditing ? html`
             <div class="space-y-2 mb-3">
               <label class="flex items-center gap-2 text-xs text-t2">
-                <input id="ar-enabled" type="checkbox" .checked=${this.autoReplenish.enabled} /> 启用自动补充
+                <input id="ar-enabled" type="checkbox" .checked=${this.autoReplenish.enabled} /> ${t('settings.enableAutoReplenish')}
               </label>
               <div>
-                <label class="block text-xs text-t3 mb-1">最少健康 Key 数量</label>
+                <label class="block text-xs text-t3 mb-1">${t('settings.minHealthyKeys')}</label>
                 <input id="ar-min-keys" type="number" class="input w-full" min="1" max="50" .value=${String(this.autoReplenish.min_healthy_keys)} />
               </div>
               <div>
-                <label class="block text-xs text-t3 mb-1">剩余额度阈值（低于此值视为不健康）</label>
+                <label class="block text-xs text-t3 mb-1">${t('settings.remainingThreshold')}</label>
                 <input id="ar-threshold" type="number" class="input w-full" min="1" max="500" .value=${String(this.autoReplenish.remaining_threshold)} />
               </div>
             </div>
             <div class="flex gap-2">
-              <button class="btn btn-primary btn-sm" @click=${() => this.saveAutoReplenish()}>保存</button>
-              <button class="btn btn-ghost btn-sm" @click=${() => this.arEditing = false}>取消</button>
+              <button class="btn btn-primary btn-sm" @click=${() => this.saveAutoReplenish()}>${t('common.save')}</button>
+              <button class="btn btn-ghost btn-sm" @click=${() => this.arEditing = false}>${t('common.cancel')}</button>
             </div>
           ` : html`
-            <button class="btn btn-ghost btn-sm" @click=${() => this.arEditing = true}>配置</button>
+            <button class="btn btn-ghost btn-sm" @click=${() => this.arEditing = true}>${t('common.configure')}</button>
           `}
         </div>
 
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <div>
-              <div class="text-sm font-medium text-t1">API Token</div>
-              <p class="text-xs text-t3 mt-0.5">用于 GET /pick</p>
+              <div class="text-sm font-medium text-t1">${t('settings.apiToken')}</div>
+              <p class="text-xs text-t3 mt-0.5">${t('settings.apiTokenDesc')}</p>
             </div>
-            <button class="btn btn-primary btn-sm" @click=${() => this.showNewToken = true}>+ 新建</button>
+            <button class="btn btn-primary btn-sm" @click=${() => this.showNewToken = true}>${t('settings.newToken')}</button>
           </div>
           <div class="card overflow-hidden">
             <table>
-              <thead><tr><th>名称</th><th>Token</th><th>创建时间</th><th>操作</th></tr></thead>
+              <thead><tr><th>${t('settings.thName')}</th><th>${t('settings.thToken')}</th><th>${t('settings.thCreatedAt')}</th><th>${t('settings.thAction')}</th></tr></thead>
               <tbody>
-                ${!this.tokens.length ? html`<tr><td colspan="4" class="text-center text-t3 py-8">暂无 Token</td></tr>` : this.tokens.map(t => html`
+                ${!this.tokens.length ? html`<tr><td colspan="4" class="text-center text-t3 py-8">${t('settings.noTokens')}</td></tr>` : this.tokens.map(tk => html`
                   <tr>
-                    <td class="text-sm text-t1">${t.name}</td>
-                    <td><code class="font-mono text-xs text-ac cursor-pointer" title=${t.token} @click=${async () => { try { await navigator.clipboard.writeText(t.token); toast('已复制', 'success') } catch { toast('复制失败', 'error') } }}>${t.token.slice(0, 16)}...</code></td>
-                    <td class="text-xs">${t.created_at}</td>
-                    <td><button class="btn btn-danger btn-sm" @click=${() => this.deleteToken(t.id)}>删除</button></td>
+                    <td class="text-sm text-t1">${tk.name}</td>
+                    <td><code class="font-mono text-xs text-ac cursor-pointer" title=${tk.token} @click=${async () => { try { await navigator.clipboard.writeText(tk.token); toast(t('common.copied'), 'success') } catch { toast(t('common.copyFailed'), 'error') } }}>${tk.token.slice(0, 16)}...</code></td>
+                    <td class="text-xs">${tk.created_at}</td>
+                    <td><button class="btn btn-danger btn-sm" @click=${() => this.deleteToken(tk.id)}>${t('common.delete')}</button></td>
                   </tr>
                 `)}
               </tbody>
             </table>
           </div>
         </div>
+        <div class="text-xs text-t3 text-center font-mono pt-2">${__BUILD_VERSION__}</div>
       </div>
 
       ${this.showNewToken ? html`
         <div class="modal-backdrop" @click=${(e: Event) => { if (e.target === e.currentTarget) this.showNewToken = false }}>
           <div class="modal-box">
-            <h3 class="text-base font-semibold text-t1 mb-4">新建 API Token</h3>
-            <label class="block text-xs text-t3 mb-1">名称</label>
-            <input id="tn" class="input w-full mb-4" placeholder="例如：博客、脚本" />
+            <h3 class="text-base font-semibold text-t1 mb-4">${t('settings.newTokenTitle')}</h3>
+            <label class="block text-xs text-t3 mb-1">${t('settings.tokenNameLabel')}</label>
+            <input id="tn" class="input w-full mb-4" placeholder=${t('settings.tokenNamePlaceholder')} />
             <div class="flex justify-end gap-2">
-              <button class="btn btn-ghost" @click=${() => this.showNewToken = false}>取消</button>
-              <button class="btn btn-primary" @click=${() => this.createToken()}>创建</button>
+              <button class="btn btn-ghost" @click=${() => this.showNewToken = false}>${t('common.cancel')}</button>
+              <button class="btn btn-primary" @click=${() => this.createToken()}>${t('settings.create')}</button>
             </div>
           </div>
         </div>

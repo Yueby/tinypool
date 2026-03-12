@@ -4,3 +4,4 @@ node_modules/
 wrangler.toml
 frontend/dist/
 frontend/node_modules/
+/.omc
