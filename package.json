@@ -1,0 +1,24 @@
+{
+  "name": "tinypool",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n worker,vite -c blue,green \"wrangler dev\" \"cd frontend && npx vite --port 5173\"",
+    "build": "cd frontend && npm run build",
+    "deploy": "npm run build && wrangler deploy",
+    "db:migrate": "wrangler d1 execute tinypool-db --local --file=./src/db/schema.sql"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "^0.18",
+    "@scalar/hono-api-reference": "^0.5",
+    "hono": "^4",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4",
+    "concurrently": "^9.2.1",
+    "typescript": "^5",
+    "wrangler": "^4.72.0"
+  }
+}

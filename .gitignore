@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+.dev.vars
+wrangler.toml
+frontend/dist/
+frontend/node_modules/

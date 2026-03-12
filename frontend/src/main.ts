@@ -1,0 +1,5 @@
+import './components/tp-app'
+import './components/tp-dashboard'
+import './components/tp-keys'
+import './components/tp-login'
+import './components/tp-settings'
