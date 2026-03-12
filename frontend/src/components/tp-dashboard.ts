@@ -147,7 +147,7 @@ export class TpDashboard extends LitElement {
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-t1">${t('dashboard.usageTrend')}</span>
-              <span class="text-xs text-t3 font-mono tabular-nums">${t('dashboard.totalAvg', total, avg)}</span>
+              <span class="text-xs text-t3 tabular-nums">${t('dashboard.totalAvg', total, avg)}</span>
             </div>
             <select class="select text-xs" @change=${(e: Event) => { this.days = parseInt((e.target as HTMLSelectElement).value); this.load() }}>
               <option value="7" ?selected=${this.days === 7}>${t('dashboard.days7')}</option>

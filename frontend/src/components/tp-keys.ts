@@ -214,8 +214,8 @@ export class TpKeys extends LitElement {
               <button class="btn btn-ghost" @click=${() => { this.showRegister = false; this.registerResults = [] }} ?disabled=${this.registering}>
                 ${this.registerResults.length ? t('common.close') : t('common.cancel')}
               </button>
-              ${!this.registerResults.length || this.registerResults.some(r => !r.success) ? html`
-                <button class="btn btn-primary" @click=${() => this.doRegister()} ?disabled=${this.registering}>
+              ${!this.registering && (!this.registerResults.length || this.registerResults.some(r => !r.success)) ? html`
+                <button class="btn btn-primary" @click=${() => this.doRegister()}>
                   ${this.registerResults.length ? t('keys.retry') : t('keys.start')}
                 </button>
               ` : ''}
